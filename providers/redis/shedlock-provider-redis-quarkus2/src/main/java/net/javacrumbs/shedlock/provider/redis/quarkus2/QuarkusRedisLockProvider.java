@@ -12,9 +12,9 @@ import org.slf4j.LoggerFactory;
 
 import io.quarkus.redis.datasource.RedisDataSource;
 import io.quarkus.redis.datasource.keys.KeyCommands;
-import io.quarkus.redis.datasource.value.SetArgs;
 import io.quarkus.redis.datasource.value.ValueCommands;
 import io.quarkus.runtime.configuration.ConfigUtils;
+import io.vertx.mutiny.redis.client.Response;
 import net.javacrumbs.shedlock.core.AbstractSimpleLock;
 import net.javacrumbs.shedlock.core.ClockProvider;
 import net.javacrumbs.shedlock.core.ExtensibleLockProvider;
@@ -58,12 +58,13 @@ public class QuarkusRedisLockProvider implements ExtensibleLockProvider {
 
         String key = buildKey(lockConfiguration.getName(), this.environment);
         
-        String value = valueCommands.setGet(key, buildValue(),  new SetArgs().nx().px(expireTime));
-        if(value != null) {
-            if(throwsException) throw new LockException("Already locked !");
-            return Optional.empty();
-        }else {
+        Response response = redisDataSource.execute("set", key, buildValue(), "NX", "PX",  Long.toString(expireTime));
+        if (response != null && "OK".equals(response.toString())) {
             return Optional.of(new RedisLock(key, this, lockConfiguration));
+        } else {
+            if (throwsException)
+                throw new LockException("Already locked !");
+            return Optional.empty();
         }
         
     }
@@ -85,8 +86,7 @@ public class QuarkusRedisLockProvider implements ExtensibleLockProvider {
 
 
     private boolean extendKeyExpiration(String key, long expiration) {
-        String value = valueCommands.setGet(key, buildValue(),  new SetArgs().xx().px(expiration));
-        return value != null;
+        return keyCommands.pexpire(key,expiration);
         
     }
 

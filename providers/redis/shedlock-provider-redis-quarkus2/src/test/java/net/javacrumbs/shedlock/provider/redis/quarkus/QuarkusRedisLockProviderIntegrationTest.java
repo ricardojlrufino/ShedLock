@@ -31,10 +31,6 @@ public class QuarkusRedisLockProviderIntegrationTest extends AbstractExtensibleL
         this.values = dataSource.value(String.class);
     }
     
-    @Test
-    void warmUp() throws Exception {
-        this.values.getDataSource();
-    }
     
     @Override
     protected void assertUnlocked(String lockName) {
